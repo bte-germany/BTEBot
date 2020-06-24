@@ -1,0 +1,9 @@
+{
+    "token": "",
+    "prefix": "$",
+    "channel_id": 0,
+    "server_file": "/home/to/server/dir/server.jar",
+    "screen_name": "minecraft",
+    "world_name": "world",
+    "java_args": ""
+}
