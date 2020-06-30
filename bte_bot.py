@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import subprocess
 from shutil import copyfile
 from uuid import UUID
@@ -48,7 +49,7 @@ class Bot(discord.Client):
                     command = split_command[0].lower()
                     args = split_command[1:]
 
-                    if command in ['start', 'stop', 'status', 'playerdata', 'help', 'prefix', 'config']:
+                    if command in ['start', 'stop', 'status', 'playerdata', 'help', 'prefix', 'config', 'deleteworld']:
                         if command == 'help':
                             await self.bot_response(channel=channel, author=message_author, result=self.command_help(), action=command.capitalize())
                         elif command == 'prefix':
@@ -63,6 +64,8 @@ class Bot(discord.Client):
                             await self.bot_response(channel=channel, author=message_author, result=self.command_playerdata(args=args), action=command.capitalize())
                         elif command == 'config':
                             await self.bot_response(channel=channel, author=message_author, result=self.command_config(), action=command.capitalize())
+                        elif command == 'deleteworld':
+                            await self.bot_response(channel=channel, author=message_author, result=self.command_deleteworld(args=args), action=command.capitalize())
                         else:
                             await self.bot_response(channel=channel, author=message_author, result='Etwas ist schief gelaufen, bitte versuche es erneut')
                     else:
@@ -80,12 +83,13 @@ class Bot(discord.Client):
     def command_help(self) -> str:
         help_text = 'Folgende Kommandos werden unterstützt:\n\n'
         help_text += '`{0}config`:    Lädt die Konfiguration aus config.json neu.\n\n'
+        help_text += '`{0}deleteworld <Name>`:    Löscht die angegebene Welt. **Dies kann nicht rückgängig gemacht werden!**\n\n'
         help_text += '`{0}help`:    Zeigt die Hilfe an.\n\n'
         help_text += '`{0}playerdata <Name>`:    Löscht die Daten des angegebenen Spielers, wodurch er wieder mit leerem Inventar am Spawn spawnt.\n\n'
-        help_text+= '`{0}prefix <neues Prefix>`:    Ändert das Prefix, welches der Bot verwendet.\n\n'
-        help_text+= '`{0}start`:    Startet den MC-Server, sofern er nicht bereits läuft.\n\n'
+        help_text += '`{0}prefix <neues Prefix>`:    Ändert das Prefix, welches der Bot verwendet.\n\n'
+        help_text += '`{0}start`:    Startet den MC-Server, sofern er nicht bereits läuft.\n\n'
         help_text += '`{0}status`:    Überprüft den aktuellen Serverstatus.\n\n'
-        help_text  += '`{0}stop`:    Stoppt den Server, sofern er läuft.'
+        help_text += '`{0}stop`:    Stoppt den Server, sofern er läuft.'
 
         return help_text.format(self._config['prefix'])
 
@@ -101,7 +105,7 @@ class Bot(discord.Client):
 
     def is_server_running(self) -> bool:
         screen_list = subprocess.Popen(["screen", "-list"], stdout=subprocess.PIPE, universal_newlines=True)
-        grep_result = subprocess.Popen(["grep", "minecraft"], stdin=screen_list.stdout, stdout=subprocess.PIPE, universal_newlines=True)
+        grep_result = subprocess.Popen(["grep", self._config['screen_name']], stdin=screen_list.stdout, stdout=subprocess.PIPE, universal_newlines=True)
         output, error = grep_result.communicate()
 
         return len(output) > 0
@@ -160,6 +164,30 @@ class Bot(discord.Client):
     def command_config(self) -> str:
         self.load_config()
         return 'Konfiguration erfolgreich geladen.'
+
+    def command_deleteworld(self, args: list) -> str:
+        if len(args) > 0:
+            if self.is_server_running():
+                return 'Der Server muss aus sein, bevor die Welt gelöscht werden kann.'
+            else:
+                world_name = args[0]
+                world_nether_name = world_name + '_nether'
+                world_the_end__name = world_name + '_the_end'
+
+                server_path = os.path.dirname(self._config['server_file'])
+                world_path = server_path + os.path.sep + world_name
+                world_nether_path = server_path + os.path.sep + world_nether_name
+                world_the_end_path = server_path + os.path.sep + world_the_end__name
+
+                if os.path.isdir(world_path):
+                    shutil.rmtree(world_path, ignore_errors=True)
+                    shutil.rmtree(world_nether_path, ignore_errors=True)
+                    shutil.rmtree(world_the_end_path, ignore_errors=True)
+                    return 'Welt erfolgreich gelöscht.'
+                else:
+                    return 'Konnte Welt {0} nicht finden.'.format(world_name)
+        else:
+            return 'Du musst den Namen der Welt angeben: {0}deleteworld <name>'.format(self._config['prefix'])
 
 
 Bot()
