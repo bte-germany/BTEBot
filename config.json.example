@@ -11,7 +11,10 @@
             "server_file": "/home/to/server/dir/server.jar",
             "screen_name": "minecraft",
             "world_name": "world",
-            "java_args": ""
+            "java_args": "-Xms1024M -Xmx1024M"
         }
-    }
+    },
+    "forbidden_commands": [
+        "deleteworld"
+    ]
 }

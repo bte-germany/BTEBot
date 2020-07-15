@@ -1,9 +1,8 @@
 import json
 import os
+import re
 import shutil
-import subprocess
 from shutil import copyfile
-from typing import Tuple
 from uuid import UUID
 
 import discord
@@ -51,7 +50,7 @@ class Bot(discord.Client):
                     command = split_command[0].lower()
                     args = split_command[1:]
 
-                    if command in ["start", "stop", "status", "playerdata", "help", "prefix", "config", "deleteworld", "ssh"]:
+                    if command in ["start", "stop", "status", "playerdata", "help", "prefix", "config", "deleteworld"] and command not in self._config["forbidden_commands"]:
                         if command == "help":
                             await self.bot_response(channel=channel, author=message_author, result=self.command_help(), action=command.capitalize())
                         elif command == "prefix":
@@ -68,8 +67,6 @@ class Bot(discord.Client):
                             await self.bot_response(channel=channel, author=message_author, result=self.command_config(), action=command.capitalize())
                         elif command == "deleteworld":
                             await self.bot_response(channel=channel, author=message_author, result=self.command_deleteworld(args=args), action=command.capitalize())
-                        elif command == "ssh":
-                            await self.bot_response(channel=channel, author=message_author, result=self.ssh_test(args=args), action=command.capitalize())
                         else:
                             await self.bot_response(channel=channel, author=message_author, result="Etwas ist schief gelaufen, bitte versuche es erneut")
                     else:
@@ -109,14 +106,11 @@ class Bot(discord.Client):
 
     def is_server_running(self, server: str) -> bool:
         server_config = self._config["servers"][server]
+        screen_name = re.sub(r'\W+', '', server_config["screen_name"])
 
-        ssh_stdin, ssh_stdout, ssh_stderr = self.send_ssh_command(server_config=server_config, command="screen -list | grep {0}".format(server_config["screen_name"]))
+        ssh_output = self.send_ssh_command(server_config=server_config, command="""sh -c 'screen -list | grep {0} | cat'""".format(screen_name))
 
-        screen_list = subprocess.Popen(["screen", "-list"], stdout=subprocess.PIPE, universal_newlines=True)
-        grep_result = subprocess.Popen(["grep", server_config["screen_name"]], stdin=screen_list.stdout, stdout=subprocess.PIPE, universal_newlines=True)
-        output, error = grep_result.communicate()
-
-        return len(output) > 0
+        return len(ssh_output) > 0
 
     def command_start(self, args: list) -> str:
         if len(args) > 0:
@@ -126,17 +120,18 @@ class Bot(discord.Client):
                 if self.is_server_running(server=server):
                     return "Server läuft bereits."
                 else:
-                    screen_command = ["screen", "-d", "-m", "-S", self._config["screen_name"]]
-                    java_command = ["java"]
-                    java_command = java_command + server_config["java_args"].split(" ")
-                    java_command = java_command + ["-jar"]
-                    java_command = java_command + [server_config["server_file"]]
-
-                    screen_command = screen_command + java_command
-
-                    subprocess.Popen(screen_command, cwd=os.path.dirname(os.path.realpath(server_config["server_file"])))
+                    self.send_ssh_command(server_config=server_config, command="cd \"{0}\"; screen -AmdS {1} java {2} -jar {3}; sleep 1s".format(
+                        os.path.dirname(server_config["server_file"]),
+                        re.sub(r'\W+', '', server_config["screen_name"]),
+                        server_config["java_args"],
+                        server_config["server_file"]
+                    ))
 
                     return "Server wurde gestartet."
+            else:
+                return "Unbekannter Server {0}".format(server)
+        else:
+            return "Du musst einen Servernamen angeben!"
 
     def command_stop(self, args: list) -> str:
         if len(args) > 0:
@@ -144,7 +139,7 @@ class Bot(discord.Client):
             if self._config.get("servers").get(server) is not None:
                 server_config = self._config["servers"][server]
                 if self.is_server_running(server=server):
-                    subprocess.Popen(["screen", "-S", server_config["screen_name"], "-X", "stuff", "stop^M"])
+                    self.send_ssh_command(server_config=server_config, command="screen -S {0} -X stuff stop^M".format(server_config["screen_name"]))
 
                     return "Server wurde beendet."
                 else:
@@ -169,19 +164,20 @@ class Bot(discord.Client):
 
     def command_playerdata(self, args: list) -> str:
         if len(args) > 0:
-            if len(args) > 1:
-                server = args[0]
-                if self._config.get("servers").get(server) is not None:
-                    server_config = self._config["servers"][server]
+            server = args[0]
+            if self._config.get("servers").get(server) is not None:
+                server_config = self._config["servers"][server]
+                if len(args) > 1:
                     player = GetPlayerData(args[1])
 
                     if player.valid is True:
                         server_path = os.path.dirname(server_config["server_file"])
                         player_uuid = str(UUID(player.uuid))
-                        player_file = server_path + os.path.sep + server_config["world_name"] + os.path.sep + "playerdata" + os.path.sep + player_uuid + ".dat"
+                        player_file = server_path + "/" + server_config["world_name"] + "/" + "playerdata" + "/" + player_uuid + ".dat"
 
-                        if os.path.isfile(player_file):
-                            os.remove(player_file)
+                        ssh_output = self.send_ssh_command(server_config=server_config, command="if test -f \"{0}\"; then echo \"1\"; else echo \"0\"; fi".format(player_file)).replace("\n", "")
+                        if ssh_output == "1":
+                            self.send_ssh_command(server_config=server_config, command="rm \"{0}\"".format(player_file))
 
                             return "Spielerdaten für {0} ({1}) erfolgreich gelöscht".format(player.username, player.uuid)
                         else:
@@ -189,11 +185,11 @@ class Bot(discord.Client):
                     else:
                         return "Konnte Spieler mit der Kennung {0} nicht finden.".format(args[0])
                 else:
-                    return "Unbekannter Server {0}".format(server)
+                    return "Du musst einen Spielernamen oder eine UUID angeben! `" + self._config["prefix"] + "playerdata <Server> <Name oder UUID>`"
             else:
-                return "Du musst einen Servername angeben!"
+                return "Unbekannter Server {0}".format(server)
         else:
-            return "Du musst einen Spielernamen oder eine UUID angeben! `" + self._config["prefix"] + "playerdata <Name oder UUID>`"
+            return "Du musst einen Servernamen angeben!"
 
     def command_config(self) -> str:
         self.load_config()
@@ -231,25 +227,13 @@ class Bot(discord.Client):
         else:
             return "Du musst einen Servernamen angeben!"
 
-    def ssh_test(self, args: list) -> str:
-        if len(args) > 0:
-            server = args[0]
-            if self._config.get("servers").get(server) is not None:
-                server_config = self._config[server]
-
-                ssh_stdin, ssh_stdout, ssh_stderr = self.send_ssh_command(server_config=server_config, command="ls -alh")
-                return "Kommando erfolgreich ausgeführt.\nErgebnis: {0}".format(ssh_stdout)
-            else:
-                return "Unbekannter Server {0}!".format(server)
-        else:
-            return "Du musst einen Servernamen angeben."
-
-    def send_ssh_command(self, server_config: dict, command: str) -> Tuple[str, str, str]:
+    def send_ssh_command(self, server_config: dict, command: str) -> str:
         ssh = paramiko.SSHClient()
         ssh.load_system_host_keys()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.connect(hostname=server_config["host"], username=server_config["username"], password=server_config["password"], port=server_config["port"])
-        return ssh.exec_command(command=command)
+        ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command(command=command)
+        return ssh_stdout.read().decode()
 
 
 Bot()
