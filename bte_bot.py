@@ -1,7 +1,6 @@
 import json
 import os
 import re
-import shutil
 from shutil import copyfile
 from uuid import UUID
 
@@ -50,7 +49,7 @@ class Bot(discord.Client):
                     command = split_command[0].lower()
                     args = split_command[1:]
 
-                    if command in ["start", "stop", "status", "playerdata", "help", "prefix", "config", "deleteworld"] and command not in self._config["forbidden_commands"]:
+                    if command in ["start", "stop", "status", "playerdata", "help", "prefix", "config"] and command not in self._config["forbidden_commands"]:
                         if command == "help":
                             await self.bot_response(channel=channel, author=message_author, result=self.command_help(), action=command.capitalize())
                         elif command == "prefix":
@@ -65,8 +64,6 @@ class Bot(discord.Client):
                             await self.bot_response(channel=channel, author=message_author, result=self.command_playerdata(args=args), action=command.capitalize())
                         elif command == "config":
                             await self.bot_response(channel=channel, author=message_author, result=self.command_config(), action=command.capitalize())
-                        elif command == "deleteworld":
-                            await self.bot_response(channel=channel, author=message_author, result=self.command_deleteworld(args=args), action=command.capitalize())
                         else:
                             await self.bot_response(channel=channel, author=message_author, result="Etwas ist schief gelaufen, bitte versuche es erneut")
                     else:
@@ -194,38 +191,6 @@ class Bot(discord.Client):
     def command_config(self) -> str:
         self.load_config()
         return "Konfiguration erfolgreich geladen."
-
-    def command_deleteworld(self, args: list) -> str:
-        if len(args) > 0:
-            server = args[0]
-            if len(args) > 1:
-                if self._config.get("servers").get(server) is not None:
-                    server_config = self._config["servers"][server]
-                    if self.is_server_running(server):
-                        return "Der Server muss aus sein, bevor die Welt gelöscht werden kann."
-                    else:
-                        world_name = args[0]
-                        world_nether_name = world_name + "_nether"
-                        world_the_end__name = world_name + "_the_end"
-
-                        server_path = os.path.dirname(server_config["server_file"])
-                        world_path = server_path + os.path.sep + world_name
-                        world_nether_path = server_path + os.path.sep + world_nether_name
-                        world_the_end_path = server_path + os.path.sep + world_the_end__name
-
-                        if os.path.isdir(world_path):
-                            shutil.rmtree(world_path, ignore_errors=True)
-                            shutil.rmtree(world_nether_path, ignore_errors=True)
-                            shutil.rmtree(world_the_end_path, ignore_errors=True)
-                            return "Welt erfolgreich gelöscht."
-                        else:
-                            return "Konnte Welt {0} nicht finden.".format(world_name)
-                else:
-                    return "Unbekannter Server {0}".format(server)
-            else:
-                return "Du musst den Namen der Welt angeben: {0}deleteworld <Server> <Name>".format(self._config["prefix"])
-        else:
-            return "Du musst einen Servernamen angeben!"
 
     def send_ssh_command(self, server_config: dict, command: str) -> str:
         ssh = paramiko.SSHClient()
