@@ -81,7 +81,6 @@ class Bot(discord.Client):
     def command_help(self) -> str:
         help_text = "Folgende Kommandos werden unterstützt:\n\n"
         help_text += "`{0}config`:    Lädt die Konfiguration aus config.json neu.\n\n"
-        help_text += "`{0}deleteworld <Name>`:    Löscht die angegebene Welt. **Dies kann nicht rückgängig gemacht werden!**\n\n"
         help_text += "`{0}help`:    Zeigt die Hilfe an.\n\n"
         help_text += "`{0}playerdata <Name>`:    Löscht die Daten des angegebenen Spielers, wodurch er wieder mit leerem Inventar am Spawn spawnt.\n\n"
         help_text += "`{0}prefix <neues Prefix>`:    Ändert das Prefix, welches der Bot verwendet.\n\n"
