@@ -84,13 +84,13 @@ class Bot(discord.Client):
     def command_help(self) -> str:
         help_text = "Folgende Kommandos werden unterstützt:\n\n"
         help_text += "`{0}config`:    Lädt die Konfiguration aus config.json neu.\n\n"
-        help_text += "`{0}deleteworld <Name>`:    Löscht die angegebene Welt. **Dies kann nicht rückgängig gemacht werden!**\n\n"
+        help_text += "`{0}deleteworld <Server> <Name>`:    Löscht die angegebene Welt. **Dies kann nicht rückgängig gemacht werden!**\n\n"
         help_text += "`{0}help`:    Zeigt die Hilfe an.\n\n"
-        help_text += "`{0}playerdata <Name>`:    Löscht die Daten des angegebenen Spielers, wodurch er wieder mit leerem Inventar am Spawn spawnt.\n\n"
+        help_text += "`{0}playerdata <Server> <Name>`:    Löscht die Daten des angegebenen Spielers, wodurch er wieder mit leerem Inventar am Spawn spawnt.\n\n"
         help_text += "`{0}prefix <neues Prefix>`:    Ändert das Prefix, welches der Bot verwendet.\n\n"
-        help_text += "`{0}start`:    Startet den MC-Server, sofern er nicht bereits läuft.\n\n"
-        help_text += "`{0}status`:    Überprüft den aktuellen Serverstatus.\n\n"
-        help_text += "`{0}stop`:    Stoppt den Server, sofern er läuft."
+        help_text += "`{0}start <Server>`:    Startet den MC-Server, sofern er nicht bereits läuft.\n\n"
+        help_text += "`{0}status <Server>`:    Überprüft den aktuellen Serverstatus.\n\n"
+        help_text += "`{0}stop <Server>`:    Stoppt den Server, sofern er läuft."
 
         return help_text.format(self._config["prefix"])
 
