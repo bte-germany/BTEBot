@@ -31,6 +31,11 @@ class Bot(discord.Client):
 
         with open("config.json") as config_file:
             self._config = json.load(config_file)
+            self.set_playing()
+
+    def set_playing(self):
+        game = self._config["prefix"] + "help"
+        self.change_presence(activity=discord.Game(name=game))
 
     async def on_message(self, message: Message):
         channel_id = self._config["channel_id"]
